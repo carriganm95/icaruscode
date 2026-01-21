@@ -86,8 +86,8 @@ physics.analyzers.caloskimW.SimChannelproducer: "merge"
 physics.analyzers.caloskimW.RawDigitproducers: ["MCDecodeTPCROI:PHYSCRATEDATATPCWW", "MCDecodeTPCROI:PHYSCRATEDATATPCWE"]
 physics.analyzers.caloskimW.SelectEvents: [reco]
 
-physics.producers.mcassociationsGausCryoE.HitParticleAssociations.HitModuleLabelVec: ["cluster3DCryoE"]
-physics.producers.mcassociationsGausCryoW.HitParticleAssociations.HitModuleLabelVec: ["cluster3DCryoW"]
+physics.producers.mcassociationsGausCryoE.HitParticleAssociations.HitModuleLabelVec: ["gaushit2dTPCEE", "gaushit2dTPCEW", "gaushit2dTPCWE", "gaushit2dTPCWW"]
+physics.producers.mcassociationsGausCryoW.HitParticleAssociations.HitModuleLabelVec: ["gaushit2dTPCEE", "gaushit2dTPCEW", "gaushit2dTPCWE", "gaushit2dTPCWW"]
 
 # Remove missing products in MC
 physics.analyzers.simpleLightAna.TriggerLabel: ""
