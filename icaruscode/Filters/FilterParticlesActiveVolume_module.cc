@@ -73,7 +73,9 @@ namespace simfilter {
       double fYmax;
       double fYmin;
       int finActive;
-      int filtpart;
+      std::vector<int> filtpart;
+      std::vector<int> maxParticles;
+      std::vector<int> particleCount;
   };
 
 } // namespace simfilter
@@ -120,7 +122,9 @@ namespace simfilter {
           fYmin=-999;
           fZmin=-999;
       }
-      filtpart       =  p.get< int >("filterpart");
+      filtpart       =  p.get< std::vector<int> >("filterpart");
+      maxParticles   =  p.get< std::vector<int> >("maxParticles");
+      particleCount.resize(filtpart.size(),0);
       
     return;
   }
@@ -129,15 +133,29 @@ namespace simfilter {
   bool FilterParticlesActiveVolume::filter(art::Event& evt)
   {
     bool interactionDesired(false);
+    bool inFVolume(false);
     //get the list of particles from this event
     art::ServiceHandle<geo::Geometry> geom;
 
-      
+    bool pass = false;
+    for (int c=0 ; c<(int)particleCount.size(); c++){
+      if (c==0) pass = particleCount[c]>=maxParticles[c];
+      else
+        pass = pass && (particleCount[c]>=maxParticles[c]);
+
+      if (!pass) break;
+    }
+
+    if (pass) {
+      return false;
+    }
+
     // * MC truth information
 
       //std::vector< art::Handle< std::vector<simb::MCTruth> > > allmclists;
       //evt.getManyByType(allmclists);
       auto allmclists = evt.getMany< std::vector<simb::MCTruth> >();
+      auto const& mcHandle = *evt.getValidHandle<std::vector<simb::MCParticle>>("largeant");
 
 
       std::cout << fXmin << " " << fXmax << " " << fYmin << " " <<fYmax << " " << fZmin << " " << fZmax << std::endl;
@@ -179,52 +197,58 @@ namespace simfilter {
       std::cout << h10 << " " << w10 << " " << l10 << std::endl;
       std::cout << h11 << " " << w11 << " " << l11 << std::endl;
       
-      for(size_t mcl = 0; mcl < allmclists.size(); ++mcl){
-          art::Handle< std::vector<simb::MCTruth> > mclistHandle = allmclists[mcl];
-          for(size_t m = 0; m < mclistHandle->size(); ++m){
-              art::Ptr<simb::MCTruth> mct(mclistHandle, m);
-              for(int ipart=0;ipart<mct->NParticles();ipart++){
-                  int pdg=mct->GetParticle(ipart).PdgCode();
-                  double xx=mct->GetParticle(ipart).Vx();
-                  double yy=mct->GetParticle(ipart).Vy();
-                  double zz=mct->GetParticle(ipart).Vz();
+      for (auto &mcp : mcHandle) {
+
+                  int pdg=mcp.PdgCode();
+                  //if(abs(pdg==11)) std::cout << "Found an electron!" << std::endl;
+                  //std::cout << "Event " << evt.id().event() << ": Particle has PDG " << pdg << std::endl;
+                  double xx=mcp.Vx();
+                  double yy=mcp.Vy();
+                  double zz=mcp.Vz();
       
-		  if (finActive==1 && pdg==filtpart)
-		    {
-                      if (xx>(xyzcenter00.X()-w00) && xx<(xyzcenter00.X()+w00) && yy>(xyzcenter00.Y()-h00) && yy<(xyzcenter00.Y()+h00) && zz>(xyzcenter00.Z()-l00/2) && zz<(xyzcenter00.Z()+l00/2))
-			{
-			  interactionDesired = true;
-			}
-                      if (xx>(xyzcenter01.X()-w01) && xx<(xyzcenter01.X()+w01) && yy>(xyzcenter01.Y()-h01) && yy<(xyzcenter01.Y()+h01) && zz>(xyzcenter01.Z()-l01/2) && zz<(xyzcenter01.Z()+l01/2))
-			{
-			  interactionDesired = true;
-			}
-                      if (xx>(xyzcenter10.X()-w10) && xx<(xyzcenter10.X()+w10) && yy>(xyzcenter10.Y()-h10) && yy<(xyzcenter10.Y()+h10) && zz>(xyzcenter10.Z()-l10/2) && zz<(xyzcenter10.Z()+l10/2))
-			{
-			  interactionDesired = true;
-			}
-                      if (xx>(xyzcenter11.X()-w11) && xx<(xyzcenter11.X()+w11) && yy>(xyzcenter11.Y()-h11) && yy<(xyzcenter11.Y()+h11) && zz>(xyzcenter11.Z()-l11/2) && zz<(xyzcenter11.Z()+l11/2))
-			{
-			  interactionDesired = true;
-			}
+                  if (finActive==1 && std::find(filtpart.begin(), filtpart.end(), std::abs(pdg)) != filtpart.end()){
+                    auto it = std::find(filtpart.begin(), filtpart.end(), std::abs(pdg));
+                    if (xx>(xyzcenter00.X()-w00) && xx<(xyzcenter00.X()+w00) && yy>(xyzcenter00.Y()-h00) && yy<(xyzcenter00.Y()+h00) && zz>(xyzcenter00.Z()-l00/2) && zz<(xyzcenter00.Z()+l00/2)){
+			                inFVolume = true;
+			              }
+                    if (xx>(xyzcenter01.X()-w01) && xx<(xyzcenter01.X()+w01) && yy>(xyzcenter01.Y()-h01) && yy<(xyzcenter01.Y()+h01) && zz>(xyzcenter01.Z()-l01/2) && zz<(xyzcenter01.Z()+l01/2)){
+			                inFVolume = true;
+                    }
+                    if (xx>(xyzcenter10.X()-w10) && xx<(xyzcenter10.X()+w10) && yy>(xyzcenter10.Y()-h10) && yy<(xyzcenter10.Y()+h10) && zz>(xyzcenter10.Z()-l10/2) && zz<(xyzcenter10.Z()+l10/2)){
+			                inFVolume = true;
+			              }
+                    if (xx>(xyzcenter11.X()-w11) && xx<(xyzcenter11.X()+w11) && yy>(xyzcenter11.Y()-h11) && yy<(xyzcenter11.Y()+h11) && zz>(xyzcenter11.Z()-l11/2) && zz<(xyzcenter11.Z()+l11/2)){
+			                inFVolume = true;
+			              }
+
+                    if (inFVolume && it != filtpart.end()) {
+                      const size_t idx = static_cast<size_t>(std::distance(filtpart.begin(), it));
+                      if (idx < particleCount.size()) {
+                        particleCount[idx] += 1;
+                        if ( particleCount[idx] <= maxParticles[idx] ) interactionDesired = true;
+                      }
+                    }
                         
-                      if (finActive==0 && pdg==filtpart)
-                        {
-			  if (xx>fXmin && xx<fXmax && yy>fYmin && yy<fYmax && zz>fZmin && zz<fZmax)
-			    {
-			      interactionDesired = true;
-			    }
-                        }
+                    /*if (finActive==0 && abs(pdg)==filtpart){
+                      if (xx>fXmin && xx<fXmax && yy>fYmin && yy<fYmax && zz>fZmin && zz<fZmax){
+                        interactionDesired = true;
+                      }
+                    }*/
         
-		    }
-	  //	std::cout << "FilterNoDirtParticles: i is " << i << std::endl ;
-	  // Now walk through trajectory and see if it enters the TPC
-	   // trajectory loop
-	 // end Genie particle
-	      }
-          }
+		              }
+                //	std::cout << "FilterNoDirtParticles: i is " << i << std::endl ;
+                // Now walk through trajectory and see if it enters the TPC
+                // trajectory loop
+              // end Genie particle
+	            
+            
       }// loop on MCPHandle
 
+  std::cout << "FilterParticlesActiveVolume: Number of desired particles so far: " << std::endl;
+  for (auto& count: particleCount) {
+    std::cout << "\t" << count;
+  }
+  std::cout << std::endl;
   return interactionDesired;
     
   } // end FilterNoDirtParticles()function

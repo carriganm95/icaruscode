@@ -1,0 +1,107 @@
+#include "services_common_icarus.fcl"
+#include "channelmapping_icarus.fcl"
+
+#include "mchitmodules.fcl"
+#include "mctrutht0matching.fcl"
+#include "mcreco.fcl"
+#include "backtrackerservice.fcl"
+#include "particleinventoryservice.fcl"
+#include "stage1_icarus_driver_common.fcl"
+process_name: skim
+
+services:
+{
+  TFileService:           { }
+  IICARUSChannelMap:      @local::icarus_channelmappinggservice
+                          @table::icarus_wirecalibration_services
+}
+
+# Disabled Space-Charge service for calorimetry
+services.SpaceChargeService: {
+    EnableCalEfieldSCE: false
+    EnableCalSpatialSCE: false
+    EnableCorrSCE: false
+    EnableSimEfieldSCE: false
+    EnableSimSpatialSCE: false
+    InputFilename: "SCEoffsets/SCEoffsets_ICARUS_E500_voxelTH3.root"
+    RepresentationType: "Voxelized_TH3"
+    service_provider: "SpaceChargeServiceICARUS"
+}
+
+services.BackTrackerService:        @local::standard_backtrackerservice
+# In the 2D-detsim, SimChannel objects are made by the WireCell
+# drift simulation (daq), not LArG4 (largeant). Thus, we need
+# to overwrite the truth matching labels in the calibration ntuple maker
+services.BackTrackerService.BackTracker.SimChannelModuleLabel: "merge"
+services.ParticleInventoryService:  @local::standard_particleinventoryservice
+
+source:
+{
+  module_type: RootInput
+  maxEvents: -1           # or set a finite number; can override with -n
+  saveMemoryObjectThreshold: 0
+
+  # This default will be overridden when you use:
+  #   lar -c skim_FilterParticlesActiveVolume.fcl --source-list filelist.txt
+  fileNames: [ "input.root" ]
+}
+
+physics:
+{
+  producers: {}
+  analyzers: {}
+
+  filters:
+  {
+    filterParticles: {
+      module_type: FilterParticlesActiveVolume
+
+      # InActive flag:
+      #   1 -> use active volume from geometry (ignore X/Y/Z min/max)
+      #   0 -> use user-defined box [Xmin, Xmax] x [Ymin, Ymax] x [Zmin, Zmax]
+      inActive: 1
+
+      # Only used if inActive: 0
+      Xmin: -200.0   # cm, example
+      Xmax:  200.0
+      Ymin: -200.0
+      Ymax:  200.0
+      Zmin:    0.0
+      Zmax:  500.0
+
+      # PDG code to require inside the region
+      filterpart: [13, 11, 22, 2212, 111, 211]
+      maxParticles: [0, 0, 0, 0, 100, 0]
+    }
+
+  }
+
+  # Path that just runs this filter
+  p_filt: [ "filterParticles" ]
+
+  # Use this as the trigger path so only passing events go to outputs
+  trigger_paths: [ "p_filt" ]
+
+  # End path for output (defined below)
+  end_paths: [ "e_myout" ]
+}
+
+# Output configuration
+outputs:
+{
+  # Use a label that is NOT "out" so lar doesn't require --sam-* options
+  myout:
+  {
+    module_type: RootOutput
+    fileName: "test_skim.root"
+    dataTier: "reconstructed"
+    compressionLevel: 1
+    saveMemoryObjectThreshold: 0
+
+    # Only write events that pass the p_filt path
+    SelectEvents: [ "p_filt" ]
+  }
+}
+
+# End path that runs the output module
+physics.e_myout: [ "myout" ]
